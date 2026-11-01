@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrou | Licita & Contrata</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Protege a página: sem login, volta para o login
+        if (sessionStorage.getItem('logado') !== 'true' && localStorage.getItem('logado') !== 'true') {
+            window.location.replace('login.html');
+        }
+    </script>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+    <h1 class="text-6xl font-extrabold tracking-tight">Entrou</h1>
+    <button onclick="sair()" class="mt-8 text-sm underline text-slate-300 hover:text-white">Sair</button>
+    <script>
+        function sair() {
+            sessionStorage.removeItem('logado');
+            localStorage.removeItem('logado');
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>

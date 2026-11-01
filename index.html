@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Licitações</title>
+    <meta
+      name="description"
+      content="Consulta de licitações e download de editais."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  </head>
+  <body>
+    <header class="site-topbar">
+      <div class="site-topbar-inner">
+        <div class="contact-links">
+          <a href="tel:31984404775">&#9742; 31 98440-4775</a>
+          <span class="contact-divider">|</span>
+          <a href="mailto:contato@licitaecontrata.com.br">&#9993; contato@licitaecontrata.com.br</a>
+        </div>
+        <div class="social-links" aria-label="Redes sociais">
+          <a href="#" aria-label="Instagram">Instagram</a>
+          <a href="#" aria-label="LinkedIn">LinkedIn</a>
+          <a href="#" aria-label="YouTube">YouTube</a>
+        </div>
+      </div>
+    </header>
+
+    <header class="brand-header">
+      <a class="brand" href="index.html" aria-label="Licita e Contrata">
+        <svg class="brand-logo" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true">
+          <path d="M50 5 A 45 45 0 1 0 95 50 A 45 45 0 0 0 50 5 Z M50 12 A 38 38 0 1 1 12 50 A 38 38 0 0 1 50 12 Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="4 2" />
+          <path d="M42 28 L58 28 L58 38 L42 38 Z M46 38 L54 38 L54 62 L46 62 Z M35 64 L65 64 L65 70 L35 70 Z M30 72 L70 72 L70 76 L30 76 Z" />
+          <polygon points="50,20 45,28 55,28" />
+        </svg>
+        <span class="brand-copy">
+          <strong>LICITA <em>&amp;</em> CONTRATA</strong>
+          <small>CONSULTORIA E TREINAMENTO</small>
+        </span>
+      </a>
+    </header>
+
+    <main class="page">
+      <header class="page-header">
+        <h1>Licitações</h1>
+        <p id="api-status" class="api-status" aria-live="polite">Carregando licitações salvas...</p>
+      </header>
+
+      <header class="search-header">
+        <div class="search-bar" role="search" aria-label="Buscar licitações na API">
+          <div class="search-field">
+            <label for="licitacao-search">Buscar nova licitação por ID</label>
+            <input
+              id="licitacao-search"
+              type="search"
+              name="licitacao-search"
+              placeholder="Digite o número_controle_pncp"
+            />
+          </div>
+          <div class="button-row">
+            <button id="licitacao-search-button" class="search-button" type="button">Buscar</button>
+            <button id="licitacao-reload-button" class="search-button secondary" type="button">&#8635; Recarregar</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="cards" id="cards-container" aria-live="polite" aria-label="Lista de licitações"></section>
+    </main>
+
+    <script type="module" src="script.js"></script>
+  </body>
+</html>

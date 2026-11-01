@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Licita & Contrata | Consultoria e Treinamento</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .heading-font { font-family: 'Montserrat', sans-serif; }
+        .bg-overlay {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.88) 50%, rgba(15, 23, 42, 0.95) 100%),
+                        url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1920&q=80') center/cover no-repeat fixed;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-900 text-slate-800 antialiased selection:bg-slate-800 selection:text-white">
+
+    <header class="bg-black text-xs text-gray-300 py-2.5 px-4 border-b border-gray-800 relative z-20">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-2">
+            <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+                <a href="tel:31984404775" class="flex items-center gap-2 hover:text-white transition-colors">
+                    <i class="fa-solid fa-phone text-xs text-gray-400"></i>
+                    <span class="font-medium tracking-wide">31 98440-4775</span>
+                </a>
+                <span class="hidden sm:inline text-gray-700">|</span>
+                <a href="mailto:contato@licitaecontrata.com.br" class="flex items-center gap-2 hover:text-white transition-colors">
+                    <i class="fa-solid fa-envelope text-xs text-gray-400"></i>
+                    <span class="font-medium tracking-wide">contato@licitaecontrata.com.br</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <a href="#" class="hover:text-white transition-colors" title="Twitter"><i class="fa-brands fa-x-twitter"></i></a>
+                <a href="#" class="hover:text-white transition-colors" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
+                <a href="#" class="hover:text-white transition-colors" title="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+                <a href="#" class="hover:text-white transition-colors" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
+            </div>
+        </div>
+    </header>
+
+    <div class="bg-white py-5 shadow-sm border-b border-gray-200 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col items-center">
+            <a href="#" class="flex flex-col items-center group">
+                <div class="flex items-center justify-center gap-3">
+                    <svg class="w-12 h-12 text-slate-800" viewBox="0 0 100 100" fill="currentColor">
+                        <path d="M50 5 A 45 45 0 1 0 95 50 A 45 45 0 0 0 50 5 Z M50 12 A 38 38 0 1 1 12 50 A 38 38 0 0 1 50 12 Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="4 2" />
+                        <path d="M42 28 L58 28 L58 38 L42 38 Z" fill="currentColor" />
+                        <path d="M46 38 L54 38 L54 62 L46 62 Z" fill="currentColor" />
+                        <path d="M35 64 L65 64 L65 70 L35 70 Z" fill="currentColor" opacity="0.9" />
+                        <path d="M30 72 L70 72 L70 76 L30 76 Z" fill="currentColor" opacity="0.7" />
+                        <polygon points="50,20 45,28 55,28" fill="currentColor" />
+                    </svg>
+                    <div class="text-left">
+                        <div class="heading-font text-2xl font-black tracking-tight text-slate-900 leading-none">
+                            LICITA <span class="font-light text-slate-600">&</span> CONTRATA
+                        </div>
+                        <div class="text-[9px] tracking-[0.25em] font-semibold text-slate-500 uppercase mt-1 bg-slate-100 px-1.5 py-0.5 rounded text-center">
+                            Consultoria e Treinamento
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <main class="flex-1 bg-overlay flex items-center justify-center p-4 sm:p-6 lg:p-8 relative">
+        <div class="w-full max-w-md my-auto">
+
+            <div id="alertBox" class="hidden mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-3 shadow-md transition-all">
+                <i class="fa-solid fa-circle-exclamation text-red-500 mt-0.5"></i>
+                <div id="alertMessage">Por favor, preencha todos os campos para continuar.</div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-6 sm:p-8">
+                <div class="text-center mb-8">
+                    <h1 class="heading-font text-2xl font-bold text-slate-900 tracking-wide uppercase">Área Restrita</h1>
+                    <p class="text-sm text-slate-600 mt-1 font-medium">Acesse seu portal de consultoria e treinamentos</p>
+                </div>
+
+                <form id="loginForm" onsubmit="handleLogin(event)" novalidate class="space-y-5">
+
+                    <div>
+                        <label for="email" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">E-mail ou Usuário</label>
+                        <div class="relative rounded-lg shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-regular fa-envelope"></i>
+                            </div>
+                            <input type="text" id="email" name="email" placeholder="seu.email@empresa.com.br"
+                                class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all placeholder:text-slate-400 font-medium">
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label for="password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Senha</label>
+                            <a href="#" onclick="showModal('Esqueceu a senha?', 'Entre em contato pelo e-mail contato@licitaecontrata.com.br para redefinir sua senha de acesso.'); return false;" class="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors underline">
+                                Esqueceu a senha?
+                            </a>
+                        </div>
+                        <div class="relative rounded-lg shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-lock"></i>
+                            </div>
+                            <input type="password" id="password" name="password" placeholder="••••••••"
+                                class="w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent transition-all placeholder:text-slate-400 font-medium">
+                            <button type="button" onclick="togglePasswordVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors" title="Mostrar/Ocultar Senha">
+                                <i id="eyeIcon" class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1">
+                        <label class="flex items-center cursor-pointer group">
+                            <input type="checkbox" id="remember" class="w-4 h-4 rounded border-slate-300 text-slate-800 focus:ring-slate-800 cursor-pointer">
+                            <span class="ml-2.5 text-xs text-slate-600 group-hover:text-slate-900 transition-colors font-medium">Manter conectado</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform active:scale-[0.99] flex items-center justify-center gap-2 uppercase tracking-wider text-sm mt-2">
+                        <span>Acessar Conta</span>
+                        <i class="fa-solid fa-arrow-right text-xs"></i>
+                    </button>
+
+                    <button type="button" onclick="handleDemoLogin()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-3 px-4 rounded-lg border border-slate-300 transition-all duration-200 flex items-center justify-center gap-2 text-xs uppercase tracking-wider shadow-sm">
+                        <i class="fa-solid fa-flask text-slate-600"></i>
+                        <span>Entrar com Conta de Teste (Acesso Demo)</span>
+                    </button>
+                </form>
+
+                <div class="mt-8 pt-6 border-t border-slate-200/80 text-center">
+                    <p class="text-xs text-slate-500 font-medium">Ainda não possui acesso à plataforma?</p>
+                    <a href="tel:31984404775" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 hover:text-slate-900 mt-1 transition-colors">
+                        <i class="fa-solid fa-headset text-slate-600"></i> Fale com nossa consultoria
+                    </a>
+                </div>
+            </div>
+
+            <div class="text-center mt-6">
+                <p class="text-xs text-slate-400">&copy; <span id="year"></span> Licita & Contrata. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="infoModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-all">
+            <div class="w-12 h-12 bg-slate-100 text-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-shield-halved text-xl"></i>
+            </div>
+            <h3 id="modalTitle" class="heading-font text-lg font-bold text-slate-900 mb-2"></h3>
+            <p id="modalBody" class="text-xs text-slate-600 leading-relaxed mb-6"></p>
+            <button onclick="closeModal()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg text-xs uppercase tracking-wider transition-colors">Entendido</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        const API_URL = 'https://licita-e-extrai.onrender.com/auth/login'; 
+        const PAGINA_DESTINO = 'index.html';
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            hideAlert();
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const lembrar = document.getElementById('remember').checked;
+
+            if (!email && !password) {
+                showAlert('Por favor, informe seu e-mail e sua senha para realizar o login.');
+                return;
+            }
+            if (!email) {
+                showAlert('Por favor, informe o seu e-mail ou nome de usuário.');
+                return;
+            }
+            if (!password) {
+                showAlert('Por favor, digite sua senha de acesso.');
+                return;
+            }
+
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Autenticando...';
+
+            try {
+                // Envia o JSON exatamente como o backend espera: {"email": "...", "senha": "..."}
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        senha: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.erro || data.message || 'Credenciais inválidas.');
+                }
+
+                // Salva o token retornado e os dados do usuário
+                const storage = lembrar ? localStorage : sessionStorage;
+                
+                if (data.token) {
+                    storage.setItem('access_token', data.token);
+                }
+                storage.setItem('logado', 'true');
+                if (data.usuario) {
+                    storage.setItem('user_data', JSON.stringify(data.usuario));
+                }
+
+                window.location.href = PAGINA_DESTINO;
+
+            } catch (error) {
+                console.error('Erro no login:', error);
+                showAlert(error.message || 'Não foi possível conectar ao servidor. Verifique o CORS no backend.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+        }
+
+        function handleDemoLogin() {
+            hideAlert();
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+
+            // Credenciais oficiais informadas pelo Bruno
+            emailInput.value = 'user@licita.com.br';
+            passwordInput.value = 'lic1t4@pUc.2026';
+
+            emailInput.classList.add('ring-2', 'ring-emerald-500');
+            passwordInput.classList.add('ring-2', 'ring-emerald-500');
+
+            setTimeout(() => {
+                document.getElementById('loginForm').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }, 400);
+        }
+
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+            }
+        }
+
+        function showAlert(message) {
+            document.getElementById('alertMessage').textContent = message;
+            document.getElementById('alertBox').classList.remove('hidden');
+        }
+
+        function hideAlert() {
+            document.getElementById('alertBox').classList.add('hidden');
+        }
+
+        function showModal(title, text) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').textContent = text;
+            const modal = document.getElementById('infoModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('infoModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    </script>
+</body>
+</html>
