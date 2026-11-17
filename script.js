@@ -1,7 +1,12 @@
 import { apiFetch } from './api.js';
-import { requireAuthentication } from './auth.js';
+import { clearToken, redirectToLogin, requireAuthentication } from './auth.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('logout-button')?.addEventListener('click', () => {
+    clearToken();
+    redirectToLogin();
+  });
+
   const cardsContainer = document.getElementById('cards-container');
   const statusElement = document.getElementById('api-status');
   const searchInput = document.getElementById('licitacao-search');
@@ -256,6 +261,35 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  const CREATED_AT_KEYS = [
+    'created_at', 'createdAt', 'criado_em', 'criadoEm', 'data_criacao', 'dataCriacao',
+    'data_criação', 'data_resumo', 'data_analise', 'data_análise', 'analisado_em',
+    'processado_em', 'updated_at', 'updatedAt', 'atualizado_em', 'timestamp', 'data'
+  ];
+
+  function formatCreatedAt(record) {
+    const raw = getValue(record, CREATED_AT_KEYS) || getValue(getLicitationRecord(record), CREATED_AT_KEYS);
+    if (!raw) {
+      return '';
+    }
+
+    let value = raw;
+    // Datas ISO sem fuso (ex.: 2026-05-10T14:30:00) vindas de servidores em UTC.
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(value)) {
+      value += 'Z';
+    }
+    if (typeof value === 'number' && value < 1e12) {
+      value *= 1000;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  }
+
   function buildCardTemplate(licitacao, isOpen = false) {
     const record = normalizeSingleResponse(licitacao);
     const licitacaoData = getLicitationRecord(record);
@@ -264,28 +298,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusValue = getValue(record, ['status']) || getValue(licitacaoData, ['status']) || 'NÃO INFORMADO';
     const summaryText = getSummaryText(record);
     const editalUrl = getValue(record, ['edital_url', 'url_edital', 'link_edital', 'url', 'href', 'link']) || getValue(record.arquivo, ['url', 'uri', 'href', 'link']) || '';
+    const createdAt = formatCreatedAt(record);
 
     return `
-      <article class="licitacao-card ${isOpen ? 'is-open' : ''}" aria-label="Licitação ${idValue}">
+      <article class="licitacao-card ${isOpen ? 'is-open' : ''}" aria-label="Licitação ${escapeHtml(idValue)}">
         <button class="card-toggle" type="button" aria-expanded="${isOpen}">
           <span class="summary">
-            <span>ID: <strong>${idValue}</strong></span>
-            <span class="objet">${objectValue}</span>
+            <span class="summary-top">
+              <span class="id-chip"><span class="id-label">ID</span>${escapeHtml(idValue)}</span>
+              <span class="status-badge" data-status="${escapeHtml(String(statusValue).trim().toUpperCase())}">${
+                String(statusValue).trim().toUpperCase() === 'PENDENTE'
+                  ? '<span class="spinner" aria-hidden="true"></span>'
+                  : '<span class="status-dot" aria-hidden="true"></span>'
+              }${escapeHtml(statusValue)}</span>
+              ${createdAt ? `<span class="created-at">&#128339; Criado em ${escapeHtml(createdAt)}</span>` : ''}
+            </span>
+            <span class="objet">${escapeHtml(objectValue)}</span>
           </span>
           <span class="chevron" aria-hidden="true">${isOpen ? '−' : '+'}</span>
         </button>
 
         <div class="card-content" ${isOpen ? '' : 'hidden'}>
           <div class="download-actions">
+            <span class="actions-label">Downloads</span>
             <div class="download-options" aria-label="Formatos do resumo">
               <button class="download-button word-option" type="button">⬇ Word (.doc)</button>
               <button class="download-button pdf-option" type="button">⬇ PDF (.pdf)</button>
+              <a class="download-button edital-button" href="${escapeHtml(editalUrl || '#')}" rel="noopener noreferrer" ${editalUrl ? 'target="_blank"' : ''}>
+                ⬇ Edital
+              </a>
             </div>
-            <a class="download-button edital-button" href="${editalUrl || '#'}" rel="noopener noreferrer" ${editalUrl ? 'target="_blank"' : ''}>
-              ⬇ Edital
-            </a>
-            <span class="status-badge" data-status="${escapeHtml(statusValue)}">Status: ${escapeHtml(statusValue)}</span>
           </div>
+          <h3 class="summary-title">Resumo do edital</h3>
           <div class="summary-markdown">${markdownToHtml(summaryText)}</div>
         </div>
       </article>
@@ -328,13 +372,25 @@ document.addEventListener('DOMContentLoaded', () => {
           event.preventDefault();
           setStatus('Nenhum edital disponível para download nesta licitação.', true);
         });
+      } else {
+        editalButton.addEventListener('click', (event) => {
+          if (!window.confirm('Deseja baixar o edital desta licitação?')) {
+            event.preventDefault();
+          }
+        });
       }
 
       wordButton.addEventListener('click', () => {
+        if (!window.confirm(`Deseja baixar o resumo em Word (${safeId}.doc)?`)) {
+          return;
+        }
         triggerDownload(createDocUrl(record), `${safeId}.doc`);
       });
 
       pdfButton.addEventListener('click', () => {
+        if (!window.confirm(`Deseja baixar o resumo em PDF (${safeId}.pdf)?`)) {
+          return;
+        }
         downloadPdfFromDocument(record, `${safeId}.pdf`).catch((error) => {
           setStatus(error.message, true);
         });
@@ -358,6 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const licitacoes = normalizeListResponse(data);
       renderCards(licitacoes);
       setStatus(`Licitações salvas carregadas: ${licitacoes.length}.`);
+      return true;
     } catch (error) {
       setStatus(error.message, true);
       cardsContainer.innerHTML = `
@@ -365,6 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${error.message}</p>
         </div>
       `;
+      return false;
     }
   }
 
@@ -415,6 +473,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   searchButton.addEventListener('click', async () => {
+    if (searchButton.disabled) {
+      return;
+    }
+
+    const originalLabel = searchButton.textContent;
+    searchButton.disabled = true;
+    reloadButton.disabled = true;
+    searchButton.textContent = 'Buscando...';
+    statusElement.classList.remove('error');
+    statusElement.innerHTML = '<span class="spinner" aria-hidden="true"></span>Analisando licitação, isso pode levar alguns instantes...';
+    cardsContainer.innerHTML = `
+      <div class="loading-state" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Buscando e analisando o edital. Aguarde, pode levar até 1 minuto...</p>
+      </div>
+    `;
+
     try {
       await searchNewLicitacaoById(searchInput.value);
     } catch (error) {
@@ -424,6 +499,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <p>${error.message}</p>
         </div>
       `;
+    } finally {
+      searchButton.disabled = false;
+      reloadButton.disabled = false;
+      searchButton.textContent = originalLabel;
     }
   });
 
@@ -433,7 +512,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  reloadButton.addEventListener('click', loadSavedLicitacoes);
+  let reloadFeedbackTimer;
+
+  reloadButton.addEventListener('click', async () => {
+    if (reloadButton.disabled) {
+      return;
+    }
+
+    clearTimeout(reloadFeedbackTimer);
+    const originalLabel = '&#8635; Recarregar';
+    reloadButton.disabled = true;
+    searchButton.disabled = true;
+    reloadButton.innerHTML = '<span class="spinner" aria-hidden="true"></span>Recarregando...';
+
+    const success = await loadSavedLicitacoes();
+
+    reloadButton.disabled = false;
+    searchButton.disabled = false;
+    reloadButton.innerHTML = success ? '&#10003; Recarregado!' : '&#10007; Falha ao recarregar';
+    reloadButton.classList.toggle('success', success);
+
+    reloadFeedbackTimer = setTimeout(() => {
+      reloadButton.innerHTML = originalLabel;
+      reloadButton.classList.remove('success');
+    }, 2000);
+  });
 
   async function startApplication() {
     if (!requireAuthentication()) {

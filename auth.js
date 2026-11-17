@@ -14,6 +14,8 @@ export function clearToken() {
 	localStorage.removeItem(TOKEN_KEY);
 	sessionStorage.removeItem('logado');
 	localStorage.removeItem('logado');
+	sessionStorage.removeItem('user_data');
+	localStorage.removeItem('user_data');
 }
 
 export function redirectToLogin() {
