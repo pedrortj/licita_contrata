@@ -1,6 +1,11 @@
 import { apiFetch } from './api.js';
 import { clearToken, redirectToLogin, requireAuthentication } from './auth.js';
 
+const PNCP_API_BASE_URL = 'https://pncp.gov.br/api/consulta/v1';
+const PNCP_REPORT_DETAILS_STORAGE_KEY = 'pncp_report_details';
+const LEGACY_PENDING_PNCP_STORAGE_KEY = 'pending_pncp_procurements';
+const LEGACY_HIDDEN_LICITACOES_STORAGE_KEY = 'hidden_licitacoes';
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('logout-button')?.addEventListener('click', () => {
     clearToken();
@@ -12,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('licitacao-search');
   const searchButton = document.getElementById('licitacao-search-button');
   const reloadButton = document.getElementById('licitacao-reload-button');
+  localStorage.removeItem(LEGACY_HIDDEN_LICITACOES_STORAGE_KEY);
 
   function setStatus(message, isError = false) {
     statusElement.textContent = message;
@@ -82,6 +88,173 @@ document.addEventListener('DOMContentLoaded', () => {
     return item?.licitacao || item || {};
   }
 
+  function getStoredPncpProcurements() {
+    const stored = localStorage.getItem(PNCP_REPORT_DETAILS_STORAGE_KEY)
+      || localStorage.getItem(LEGACY_PENDING_PNCP_STORAGE_KEY);
+    if (!stored) {
+      return [];
+    }
+
+    try {
+      const procurements = JSON.parse(stored);
+      if (!Array.isArray(procurements)) {
+        localStorage.removeItem(PNCP_REPORT_DETAILS_STORAGE_KEY);
+        localStorage.removeItem(LEGACY_PENDING_PNCP_STORAGE_KEY);
+        setStatus('Os dados locais das licitações estavam inválidos e foram removidos.', true);
+        return [];
+      }
+
+      const processedProcurements = procurements.filter((item) => item && item._requiresReport !== true
+        && item.numero_controle_pncp && (item.dados_pncp || item.pncp));
+      if (processedProcurements.length !== procurements.length
+        || localStorage.getItem(LEGACY_PENDING_PNCP_STORAGE_KEY)) {
+        if (processedProcurements.length) {
+          localStorage.setItem(PNCP_REPORT_DETAILS_STORAGE_KEY, JSON.stringify(processedProcurements));
+        } else {
+          localStorage.removeItem(PNCP_REPORT_DETAILS_STORAGE_KEY);
+        }
+        localStorage.removeItem(LEGACY_PENDING_PNCP_STORAGE_KEY);
+      }
+      return processedProcurements;
+    } catch {
+      localStorage.removeItem(PNCP_REPORT_DETAILS_STORAGE_KEY);
+      localStorage.removeItem(LEGACY_PENDING_PNCP_STORAGE_KEY);
+      setStatus('Os dados locais da busca estavam inválidos e foram removidos.', true);
+      return [];
+    }
+  }
+
+  function saveStoredPncpProcurement(record) {
+    const procurements = getStoredPncpProcurements();
+    const recordId = record.numero_controle_pncp;
+    const nextProcurements = [
+      ...procurements.filter((item) => item.numero_controle_pncp !== recordId),
+      record
+    ];
+    localStorage.setItem(PNCP_REPORT_DETAILS_STORAGE_KEY, JSON.stringify(nextProcurements));
+  }
+
+  function getProcurementId(record) {
+    const licitacao = getLicitationRecord(record);
+    return getValue(record, ['numero_controle_pncp', 'numeroControlePncp'])
+      || getValue(licitacao, ['numero_controle_pncp', 'numeroControlePncp']);
+  }
+
+  function getLicitacaoIdentity(record) {
+    const licitacao = getLicitationRecord(record);
+    return getProcurementId(record)
+      || getValue(record, ['numero', 'id'])
+      || getValue(licitacao, ['numero', 'id']);
+  }
+
+  function mergeSavedAndPncpLicitacoes(savedLicitacoes, storedProcurements) {
+    const storedById = new Map(
+      storedProcurements.map((record) => [record.numero_controle_pncp, record])
+    );
+    return savedLicitacoes.map((record) => {
+      const id = getProcurementId(record);
+      if (!id) {
+        return record;
+      }
+
+      const stored = storedById.get(id);
+      if (!stored) {
+        return record;
+      }
+
+      return {
+        ...stored,
+        ...record,
+        numero_controle_pncp: id,
+        dados_pncp: stored.dados_pncp || stored.pncp,
+        pncp: stored.dados_pncp || stored.pncp,
+        licitacao: {
+          ...getLicitationRecord(stored),
+          ...getLicitationRecord(record),
+          numero_controle_pncp: id,
+          objeto: getValue(getLicitationRecord(record), ['objeto', 'objeto_compra', 'descricao'])
+            || getValue(getLicitationRecord(stored), ['objeto', 'objetoCompra', 'objeto_compra', 'descricao'])
+        },
+        resumo_edital: getValue(record, ['resumo_edital', 'resumoEdital'])
+          || getValue(stored, ['resumo_edital', 'resumoEdital'])
+      };
+    });
+  }
+
+  function parsePncpId(rawId) {
+    const id = String(rawId || '')
+      .trim()
+      .replace(/^['"]|['"]$/g, '')
+      .replace(/\s+/g, '');
+    const match = id.match(/^(\d{14})-(\d+)-(\d+)\/(\d{4})$/);
+
+    if (!match) {
+      throw new Error('Informe o ID completo no formato CNPJ-modalidade-sequencial/ano, por exemplo: 45787660000100-1-000350/2026.');
+    }
+
+    return {
+      id,
+      cnpj: match[1],
+      modalidade: match[2],
+      sequencial: match[3],
+      ano: match[4]
+    };
+  }
+
+  function unwrapPncpResponse(payload) {
+    let result = payload;
+
+    for (let depth = 0; depth < 3; depth += 1) {
+      if (Array.isArray(result)) {
+        result = result[0];
+      } else if (result && typeof result === 'object') {
+        const nested = result.data || result.resultado || result.contratacao || result.compra;
+        if (nested && typeof nested === 'object') {
+          result = nested;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
+    return result && typeof result === 'object' && !Array.isArray(result) ? result : null;
+  }
+
+  async function fetchPncpProcurement(rawId) {
+    const parsedId = parsePncpId(rawId);
+    const path = `/orgaos/${parsedId.cnpj}/compras/${parsedId.ano}/${parsedId.sequencial}`;
+    const response = await fetch(`${PNCP_API_BASE_URL}${path}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' }
+    });
+    const responseText = await response.text();
+    let payload;
+
+    try {
+      payload = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      const details = payload?.message || payload?.mensagem || payload?.detail;
+      throw new Error(
+        details || (response.status === 404
+          ? `Contratação ${parsedId.id} não encontrada no PNCP.`
+          : `Não foi possível consultar o PNCP (erro ${response.status}).`)
+      );
+    }
+
+    const procurement = unwrapPncpResponse(payload);
+    if (!procurement) {
+      throw new Error('O PNCP não retornou os dados da contratação pesquisada.');
+    }
+
+    return { ...parsedId, procurement };
+  }
+
   function getSummaryText(item) {
     const summary = item?.resumo_edital || item?.resumoEdital || getLicitationRecord(item)?.resumo_edital;
     if (Array.isArray(summary)) {
@@ -103,6 +276,157 @@ document.addEventListener('DOMContentLoaded', () => {
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#039;');
+  }
+
+  function getNestedValue(record, paths) {
+    for (const path of paths) {
+      let value = record;
+      for (const key of path) {
+        value = value?.[key];
+      }
+      if (value !== undefined && value !== null && value !== '') {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  function formatPncpDate(value, includeTime = true) {
+    if (!value) {
+      return null;
+    }
+
+    let dateValue = value;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      dateValue = `${value}T12:00:00-03:00`;
+    } else if (typeof value === 'string'
+      && /^\d{4}-\d{2}-\d{2}T/.test(value)
+      && !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) {
+      dateValue = `${value}-03:00`;
+    }
+
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    const options = includeTime
+      ? { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }
+      : { dateStyle: 'short', timeZone: 'America/Sao_Paulo' };
+    return new Intl.DateTimeFormat('pt-BR', options).format(date);
+  }
+
+  function formatPncpCnpj(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    return digits.length === 14
+      ? digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+      : value;
+  }
+
+  function formatPncpCurrency(value) {
+    if (typeof value !== 'number' && typeof value !== 'string') {
+      return value;
+    }
+
+    const amount = Number(value);
+    return Number.isFinite(amount)
+      ? amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      : value;
+  }
+
+  function getPncpDetails(record) {
+    const procurement = record?.dados_pncp || record?.pncp;
+    if (!procurement) {
+      return [];
+    }
+
+    const fields = [
+      ['Órgão/Entidade', [['orgaoEntidade', 'razaoSocial'], ['orgaoEntidade', 'nomeRazaoSocial']]],
+      ['Unidade compradora', [['unidadeOrgao', 'nomeUnidade'], ['unidadeOrgao', 'nomeUnidadeOrgao']]],
+      ['Localidade da Unidade', [['unidadeOrgao', 'municipioNome']]],
+      ['Órgão/Entidade sub-rogado', [['orgaoSubRogado', 'razaoSocial']]],
+      ['Unidade compradora sub-rogada', [['unidadeSubRogada', 'nomeUnidade']]],
+      ['Localidade da Unidade sub-rogada', [['unidadeSubRogada', 'municipioNome']]],
+      ['Modalidade da contratação', [['modalidadeNome'], ['nomeModalidade']]],
+      ['Amparo legal', [['amparoLegal', 'nome'], ['amparoLegal', 'descricao'], ['amparoLegalNome']]],
+      ['Tipo', [['tipoInstrumentoConvocatorioNome']]],
+      ['Modo de disputa', [['modoDisputaNome'], ['modoDisputa']]],
+      ['Registro de preço', [['srp']]],
+      ['Fonte orçamentária', [['fontesOrcamentarias'], ['fonteOrcamentaria', 'descricao'], ['fonteOrcamentaria'], ['fonteOrcamentariaDescricao']]],
+      ['Data de divulgação no PNCP', [['dataPublicacaoPncp'], ['dataPublicacao']]],
+      ['Situação', [['situacaoCompraNome'], ['situacaoCompra'], ['status']]],
+      ['Data de início de recebimento de propostas', [['dataAberturaProposta']]],
+      ['Data fim de recebimento de propostas', [['dataEncerramentoProposta']]],
+      ['Id contratação PNCP', [['numeroControlePNCP']]],
+      ['Fonte', [['usuarioNome'], ['nomeSistemaOrigem'], ['sistemaOrigemNome']]],
+      ['Última atualização', [['dataAtualizacao'], ['dataAtualizacaoPncp']]],
+      ['Número do edital', [['numeroCompra'], ['numeroEdital'], ['numeroAviso']]],
+      ['Valor total estimado/avaliado', [['valorTotalEstimado'], ['valorTotalHomologado']]]
+    ];
+
+    return fields.map(([label, paths]) => {
+      let value = getNestedValue(procurement, paths);
+      value = value === null ? 'Não informado' : value;
+
+      if (Array.isArray(value)) {
+        value = value.length
+          ? value.map((item) => item?.nome || item?.descricao || String(item)).join(', ')
+          : 'Não informado';
+      }
+
+      if (label === 'Última atualização' || label === 'Data de divulgação no PNCP'
+        || label === 'Data de início de recebimento de propostas' || label === 'Data fim de recebimento de propostas') {
+        value = value === 'Não informado'
+          ? value
+          : formatPncpDate(value, label !== 'Data de divulgação no PNCP');
+      }
+      if (label === 'Valor total estimado/avaliado') {
+        value = value === 'Não informado' ? value : formatPncpCurrency(value);
+      }
+      if (label === 'Registro de preço' && typeof value === 'boolean') {
+        value = value ? 'Sim' : 'Não';
+      }
+      if (label === 'Número do edital' && value !== 'Não informado') {
+        const ano = getNestedValue(procurement, [['anoCompra']]);
+        value = ano ? `${value}/${ano}` : value;
+      }
+      if (label === 'Órgão/Entidade' && value !== 'Não informado') {
+        const cnpj = getNestedValue(procurement, [['orgaoEntidade', 'cnpj']]);
+        value = cnpj ? `${formatPncpCnpj(cnpj)} - ${value}` : value;
+      }
+      if (label === 'Unidade compradora' && value !== 'Não informado') {
+        const codigo = getNestedValue(procurement, [['unidadeOrgao', 'codigoUnidade']]);
+        value = codigo ? `${codigo} - ${value}` : value;
+      }
+      if (label === 'Localidade da Unidade') {
+        const uf = getNestedValue(procurement, [['unidadeOrgao', 'ufSigla']]);
+        value = value === 'Não informado' ? value : (uf ? `${value}/${uf}` : value);
+      }
+      if (label === 'Localidade da Unidade sub-rogada' && value !== 'Não informado') {
+        const uf = getNestedValue(procurement, [['unidadeSubRogada', 'ufSigla']]);
+        value = uf ? `${value}/${uf}` : value;
+      }
+
+      return { label, value: String(value) };
+    });
+  }
+
+  function renderPncpDetails(record) {
+    const fields = getPncpDetails(record);
+    if (fields.length === 0) {
+      return '';
+    }
+
+    return `
+      <span class="pncp-details" aria-label="Dados da contratação no PNCP">
+        ${fields.map(({ label, value }) => `
+          <span class="pncp-detail">
+            <strong>${escapeHtml(label)}:</strong>
+            <span>${escapeHtml(value)}</span>
+          </span>
+        `).join('')}
+      </span>
+    `;
   }
 
   function markdownToHtml(markdown) {
@@ -293,18 +617,21 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildCardTemplate(licitacao, isOpen = false) {
     const record = normalizeSingleResponse(licitacao);
     const licitacaoData = getLicitationRecord(record);
-    const idValue = getValue(record, ['numero_controle_pncp', 'numeroControlePncp', 'numero', 'id']) || 'N/A';
+    const idValue = getLicitacaoIdentity(record) || 'N/A';
     const objectValue = getValue(licitacaoData, ['objeto', 'objeto_compra', 'descricao', 'description', 'titulo']) || 'Objeto não informado';
-    const statusValue = getValue(record, ['status']) || getValue(licitacaoData, ['status']) || 'NÃO INFORMADO';
+    const statusValue = getValue(record, ['status'])
+      || getValue(record.dados_pncp || record.pncp, ['situacaoCompraNome', 'situacaoCompra'])
+      || getValue(licitacaoData, ['status'])
+      || 'NÃO INFORMADO';
     const summaryText = getSummaryText(record);
     const editalUrl = getValue(record, ['edital_url', 'url_edital', 'link_edital', 'url', 'href', 'link']) || getValue(record.arquivo, ['url', 'uri', 'href', 'link']) || '';
     const createdAt = formatCreatedAt(record);
 
     return `
       <article class="licitacao-card ${isOpen ? 'is-open' : ''}" aria-label="Licitação ${escapeHtml(idValue)}">
-        <button class="card-toggle" type="button" aria-expanded="${isOpen}">
-          <span class="summary">
-            <span class="summary-top">
+        <div class="card-heading">
+          <div class="summary">
+            <div class="summary-top">
               <span class="id-chip"><span class="id-label">ID</span>${escapeHtml(idValue)}</span>
               <span class="status-badge" data-status="${escapeHtml(String(statusValue).trim().toUpperCase())}">${
                 String(statusValue).trim().toUpperCase() === 'PENDENTE'
@@ -312,11 +639,17 @@ document.addEventListener('DOMContentLoaded', () => {
                   : '<span class="status-dot" aria-hidden="true"></span>'
               }${escapeHtml(statusValue)}</span>
               ${createdAt ? `<span class="created-at">&#128339; Criado em ${escapeHtml(createdAt)}</span>` : ''}
-            </span>
-            <span class="objet">${escapeHtml(objectValue)}</span>
-          </span>
-          <span class="chevron" aria-hidden="true">${isOpen ? '−' : '+'}</span>
-        </button>
+            </div>
+            ${renderPncpDetails(record)}
+            <div class="objet"><strong>Objeto:</strong> ${escapeHtml(objectValue)}</div>
+          </div>
+          <div class="card-actions">
+            <button class="card-toggle" type="button" aria-label="${isOpen ? 'Recolher' : 'Expandir'} detalhes da contratação" aria-expanded="${isOpen}">
+              <span class="chevron" aria-hidden="true">${isOpen ? '−' : '+'}</span>
+            </button>
+            ${record._requiresReport ? '<button class="generate-report-button" type="button">Gerar relatório</button>' : ''}
+          </div>
+        </div>
 
         <div class="card-content" ${isOpen ? '' : 'hidden'}>
           <div class="download-actions">
@@ -348,9 +681,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    list.forEach((licitacao, index) => {
+    list.forEach((licitacao) => {
       const wrapper = document.createElement('div');
-      wrapper.innerHTML = buildCardTemplate(licitacao, index === 0);
+      wrapper.innerHTML = buildCardTemplate(licitacao);
 
       const article = wrapper.firstElementChild;
       const toggleButton = article.querySelector('.card-toggle');
@@ -359,8 +692,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const wordButton = article.querySelector('.word-option');
       const pdfButton = article.querySelector('.pdf-option');
       const editalButton = article.querySelector('.edital-button');
+      const generateReportButton = article.querySelector('.generate-report-button');
       const record = normalizeSingleResponse(licitacao);
-      const id = getValue(getLicitationRecord(record), ['numero_controle_pncp', 'numeroControlePncp', 'numero', 'id']) || 'licitacao';
+      const id = getLicitacaoIdentity(record) || 'licitacao';
       const safeId = String(id).replace(/[<>:"/\\|?*]/g, '-');
       const editalUrl = getValue(record, ['edital_url', 'url_edital', 'link_edital', 'url', 'href', 'link']) || getValue(record.arquivo, ['url', 'uri', 'href', 'link']) || '';
 
@@ -400,8 +734,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const isOpen = article.classList.contains('is-open');
         article.classList.toggle('is-open', !isOpen);
         toggleButton.setAttribute('aria-expanded', String(!isOpen));
+        toggleButton.setAttribute('aria-label', `${isOpen ? 'Expandir' : 'Recolher'} detalhes da contratação`);
         content.hidden = isOpen;
         chevron.textContent = isOpen ? '+' : '−';
+      });
+
+      generateReportButton?.addEventListener('click', () => {
+        generateReport(record, generateReportButton).catch((error) => {
+          generateReportButton.disabled = false;
+          generateReportButton.textContent = 'Gerar relatório';
+          setStatus(error.message, true);
+        });
       });
 
       cardsContainer.appendChild(article);
@@ -412,35 +755,62 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = await apiFetch('/licitacoes?page=1&page_size=10', { method: 'GET' });
       const licitacoes = normalizeListResponse(data);
-      renderCards(licitacoes);
+      const storedProcurements = getStoredPncpProcurements();
+      renderCards(mergeSavedAndPncpLicitacoes(licitacoes, storedProcurements));
       setStatus(`Licitações salvas carregadas: ${licitacoes.length}.`);
       return true;
     } catch (error) {
+      const storedProcurements = getStoredPncpProcurements();
+      if (storedProcurements.length) {
+        renderCards(storedProcurements);
+      }
       setStatus(error.message, true);
-      cardsContainer.innerHTML = `
-        <div class="empty-state error-state">
-          <p>${error.message}</p>
-        </div>
-      `;
+      if (!storedProcurements.length) {
+        cardsContainer.innerHTML = `
+          <div class="empty-state error-state">
+            <p>${error.message}</p>
+          </div>
+        `;
+      }
       return false;
     }
   }
 
   async function searchNewLicitacaoById(rawId) {
-    const idValue = String(rawId || '')
-      .trim()
-      .replace(/^['"]|['"]$/g, '')
-      .replace(/\s+/g, '');
+    const { id, procurement } = await fetchPncpProcurement(rawId);
+    const result = {
+      numero_controle_pncp: id,
+      objeto: procurement.objeto || procurement.objetoCompra,
+      dados_pncp: procurement,
+      pncp: procurement,
+      licitacao: {
+        ...procurement,
+        numero_controle_pncp: id,
+        objeto: procurement.objeto || procurement.objetoCompra
+      },
+      _requiresReport: true
+    };
+
+    renderCards([result]);
+    setStatus(`Contratação ${id} carregada do PNCP. Confira os dados e gere o relatório quando quiser.`);
+  }
+
+  async function generateReport(record, button) {
+    const licitacaoData = getLicitationRecord(record);
+    const idValue = getValue(licitacaoData, ['numero_controle_pncp', 'numeroControlePncp']);
     if (!idValue) {
-      throw new Error('Informe o ID da licitação para buscar uma nova análise.');
+      throw new Error('Não foi possível identificar o ID da contratação para gerar o relatório.');
     }
+
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner" aria-hidden="true"></span>Gerando relatório...';
+    setStatus('Enviando os dados da contratação para gerar o relatório...');
 
     const paths = [
       `/licitacoes/analisar/${encodeURIComponent(idValue)}`,
       `/licitacoes/analisar/${idValue}`
     ];
     let data;
-    let lastError;
 
     for (const path of paths) {
       try {
@@ -448,11 +818,15 @@ document.addEventListener('DOMContentLoaded', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
-          }
+          },
+          body: JSON.stringify({
+            numero_controle_pncp: idValue,
+            dados_pncp: record.dados_pncp || record.pncp,
+            licitacao: licitacaoData
+          })
         });
         break;
       } catch (error) {
-        lastError = error;
         if (error.status !== 404) {
           throw error;
         }
@@ -460,16 +834,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!data) {
-      throw new Error(`Licitação não encontrada para o ID "${idValue}". Confirme se o valor está no formato completo, por exemplo: 01409580000138-1-001625/2026.`);
+      throw new Error(`A API não retornou o relatório da contratação "${idValue}".`);
     }
 
     const result = normalizeSingleResponse(data);
     if (!result) {
-      throw new Error('A API não retornou a licitação pesquisada.');
+      throw new Error('A API não retornou o relatório da contratação.');
     }
 
-    renderCards([result]);
-    setStatus(`Licitação ${idValue} carregada com sucesso.`);
+    const pncpData = record.dados_pncp || record.pncp;
+    const reportRecord = getLicitationRecord(result);
+    saveStoredPncpProcurement({
+      ...record,
+      ...result,
+      numero_controle_pncp: idValue,
+      dados_pncp: pncpData,
+      pncp: pncpData,
+      licitacao: {
+        ...getLicitationRecord(record),
+        ...reportRecord,
+        numero_controle_pncp: idValue
+      },
+      _requiresReport: false
+    });
+    setStatus(`Relatório da contratação ${idValue} gerado. Atualizando a página...`);
+    window.location.reload();
   }
 
   searchButton.addEventListener('click', async () => {
@@ -480,13 +869,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const originalLabel = searchButton.textContent;
     searchButton.disabled = true;
     reloadButton.disabled = true;
-    searchButton.textContent = 'Buscando...';
+    searchButton.textContent = 'Consultando...';
     statusElement.classList.remove('error');
-    statusElement.innerHTML = '<span class="spinner" aria-hidden="true"></span>Analisando licitação, isso pode levar alguns instantes...';
+    statusElement.innerHTML = '<span class="spinner" aria-hidden="true"></span>Consultando os dados da contratação no PNCP...';
     cardsContainer.innerHTML = `
       <div class="loading-state" role="status">
         <span class="spinner" aria-hidden="true"></span>
-        <p>Buscando e analisando o edital. Aguarde, pode levar até 1 minuto...</p>
+        <p>Buscando os dados do edital no PNCP...</p>
       </div>
     `;
 
